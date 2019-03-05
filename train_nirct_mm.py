@@ -27,13 +27,14 @@ TRAINING_DATA_DIRECTORY = DATA_DIR_TTV + "/train"
 TESTING_DATA_DIRECTORY = DATA_DIR_TTV + "/test"
 VALIDATION_DIRECTORY = DATA_DIR_TTV + "/val"
 
-NUMBER_OF_IMAGES = len(glob(TRAINING_DATA_DIRECTORY+"/*color*")) # 11192 #len(glob.glob('./data/data_liquid/testing/image_2/*.*'))
+NUMBER_OF_IMAGES = len(glob(TRAINING_DATA_DIRECTORY+"/*color*"))
 
 IMAGE_SHAPE = (192, 192)
 
-EPOCHS = 200#25
-BATCH_SIZE = 1
 
+# HYPERPARAMETERS
+EPOCHS = 80
+BATCH_SIZE = 1
 LEARNING_RATE = 0.0001
 DROPOUT = 0.75
 
@@ -46,7 +47,7 @@ all_training_losses = []
 val_acc_list, val_loss_list = [], []
 test_acc_list, test_loss_list = [], []
 
-model_name = "./multimodal_rgb_nir_200epochs.ckpt"
+model_name = "./vgg_mm_80e_csc_nir.ckpt"
 
 # Check for a GPU
 if not tf.test.gpu_device_name():
@@ -147,20 +148,13 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes = NUMBER_
   decoderlayer4_nir = tf.add(decoderlayer3_nir, layer3x_nir, name = "decoderlayer4_nir")
   decoderlayer_nir_output = upsample(layer = decoderlayer4_nir, k = 16, s = 8, layer_name = "decoderlayer_nir_output")
 
+  # Merge networks
   network = tf.add(decoderlayer_output, decoderlayer_nir_output)
 
-  #network = tf.concat([decoderlayer_output, decoderlayer_nir_output], 1)
-
-  #networkRGB = tl.layers.InputLayer(decoderlayer_output)
-  #networkNIR = tl.layers.InputLayer(decoderlayer_nir_output)
-
-  #networkRGB = tl.layers.FlattenLayer(networkRGB, name='flatten')
-  #networkNIR = tl.layers.FlattenLayer(networkNIR, name='flatten')
-  #network = tl.layers.ConcatLayer([networkRGB, networkDepth], 1, name ='concat_layer')
-  #network = tl.layers.DenseLayer(network, 1024, act=tf.nn.relu, W_init=W_init2, b_init=b_init2, name='d1relu')
-  #network = tl.layers.DenseLayer(network, 512, act=tf.nn.relu, W_init=W_init2, b_init=b_init2, name='d2relu')
-  #network = tl.layers.DenseLayer(network, 256, act=tf.nn.relu, W_init=W_init2, b_init=b_init2, name='d3relu')
-  #network = tl.layers.DenseLayer(network, n_units=15, act=None, W_init=W_init2, name='outputs')
+  network = conv_1x1(layer = network, layer_name = "network_merged")
+  network = tf.add(network, decoderlayer_nir_output)
+  network = conv_1x1(layer = network, layer_name = "network_merged2")
+  network = conv_1x1(layer = network, layer_name = "network_merged3")
 
   return network # decoderlayer_output
 
@@ -268,6 +262,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn_nir, logits, train_op,
     LOG(train_time)
 
 
+# main:
 print("NUMBER OF IMAGES:", NUMBER_OF_IMAGES)
 
 # download vgg model

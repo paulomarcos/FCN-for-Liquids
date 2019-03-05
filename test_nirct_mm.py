@@ -30,13 +30,13 @@ NUMBER_OF_IMAGES = len(glob(TRAINING_DATA_DIRECTORY+"/*color*")) # 11192 #len(gl
 
 IMAGE_SHAPE = (192, 192)
 
+# HYPERPARAMETERS
 EPOCHS = 1#25
 BATCH_SIZE = 1
-
 LEARNING_RATE = 0.0001
 DROPOUT = 0.75
 
-model_name = "./multimodal_rgb_nir.ckpt"
+model_name = "./my_model.ckpt"
 
 correct_label = tf.placeholder(tf.float32, [None, IMAGE_SHAPE[0], IMAGE_SHAPE[1], NUMBER_OF_CLASSES])
 learning_rate = tf.placeholder(tf.float32)
@@ -52,26 +52,6 @@ else:
   print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
 def load_vgg(sess, vgg_path):
-  """
-  Load Pretrained VGG Model into TensorFlow.
-  sess: TensorFlow Session
-  vgg_path: Path to vgg folder, containing "variables/" and "saved_model.pb"
-  return: Tuple of Tensors from VGG model (image_input, keep_prob, layer3, layer4, layer7)
-  """
-  # load the model and weights
-  model = tf.saved_model.loader.load(sess, ['vgg16'], vgg_path)
-
-  # Get Tensors to be returned from graph
-  graph = tf.get_default_graph()
-  image_input = graph.get_tensor_by_name('image_input:0')
-  keep_prob = graph.get_tensor_by_name('keep_prob:0')
-  layer3 = graph.get_tensor_by_name('layer3_out:0')
-  layer4 = graph.get_tensor_by_name('layer4_out:0')
-  layer7 = graph.get_tensor_by_name('layer7_out:0')
-
-  return image_input, keep_prob, layer3, layer4, layer7
-
-def new_vgg_model(sess):
   """
   Load Pretrained VGG Model into TensorFlow.
   sess: TensorFlow Session
@@ -146,19 +126,6 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes = NUMBER_
 
   network = tf.add(decoderlayer_output, decoderlayer_nir_output)
 
-  #network = tf.concat([decoderlayer_output, decoderlayer_nir_output], 1)
-
-  #networkRGB = tl.layers.InputLayer(decoderlayer_output)
-  #networkNIR = tl.layers.InputLayer(decoderlayer_nir_output)
-
-  #networkRGB = tl.layers.FlattenLayer(networkRGB, name='flatten')
-  #networkNIR = tl.layers.FlattenLayer(networkNIR, name='flatten')
-  #network = tl.layers.ConcatLayer([networkRGB, networkDepth], 1, name ='concat_layer')
-  #network = tl.layers.DenseLayer(network, 1024, act=tf.nn.relu, W_init=W_init2, b_init=b_init2, name='d1relu')
-  #network = tl.layers.DenseLayer(network, 512, act=tf.nn.relu, W_init=W_init2, b_init=b_init2, name='d2relu')
-  #network = tl.layers.DenseLayer(network, 256, act=tf.nn.relu, W_init=W_init2, b_init=b_init2, name='d3relu')
-  #network = tl.layers.DenseLayer(network, n_units=15, act=None, W_init=W_init2, name='outputs')
-
   return network # decoderlayer_output
 
 def optimize(nn_last_layer, correct_label, learning_rate, num_classes = NUMBER_OF_CLASSES):
@@ -191,63 +158,8 @@ def LOG(X, f=None):
     else:
         f.write(time_stamp + " " + X)
 
-def train_nn(sess, epochs, batch_size, get_batches_fn_nir, train_op,
-             cross_entropy_loss, input_image, net_input_nir,
-             correct_label, keep_prob, learning_rate, saver):
-  """
-  Train neural network and print out the loss during training.
-  sess: TF Session
-  epochs: Number of epochs
-  batch_size: Batch size
-  get_batches_fn: Function to get batches of training data.  Call using get_batches_fn(batch_size)
-  train_op: TF Operation to train the neural network
-  cross_entropy_loss: TF Tensor for the amount of loss
-  input_image: TF Placeholder for input images
-  correct_label: TF Placeholder for label images
-  keep_prob: TF Placeholder for dropout keep probability
-  learning_rate: TF Placeholder for learning rate
-  """
-  for epoch in range(EPOCHS):
 
-    losses, i = [], 0
-    st = time.time()
-    epoch_st=time.time()
-
-    for images, labels, nir_images in get_batches_fn_nir(BATCH_SIZE):
-      i += 1
-
-      feed = { input_image: images,
-               net_input_nir: nir_images,
-               correct_label: labels,
-               keep_prob: DROPOUT,
-               learning_rate: LEARNING_RATE }
-
-      _, partial_loss = sess.run([train_op, cross_entropy_loss], feed_dict = feed)
-
-      if (i == 1) or (i % 20 == 0):
-          print("---> iteration: ", i, " partial loss: ", partial_loss, "time: %.2f"%(time.time()-st))
-          st = time.time()
-      losses.append(partial_loss)
-
-
-
-    training_loss = sum(losses) / len(losses)
-    all_training_losses.append(training_loss)
-    epoch_time=time.time()-epoch_st
-    remain_time=epoch_time*(EPOCHS-1-epoch)
-    m, s = divmod(remain_time, 60)
-    h, m = divmod(m, 60)
-    print("Saving model as ", model_name)
-    saver.save(sess, model_name)
-    print("------------------")
-    print("epoch: ", epoch + 1, " of ", EPOCHS, "training loss: ", training_loss)
-    print("------------------")
-    if s!=0:
-        train_time="Remaining training time = %d hours %d minutes %d seconds\n"%(h,m,s)
-    else:
-        train_time="Remaining training time : Training completed.\n"
-    LOG(train_time)
-
+# main:
 
 print("NUMBER OF IMAGES:", NUMBER_OF_IMAGES)
 
@@ -283,13 +195,6 @@ with tf.Session() as session:
     print("Loading model checkpoint weights...")
     saver = tf.train.Saver()
     saver.restore(session, model_name)
-
-    # train the neural network
-    #train_nn(session, EPOCHS, BATCH_SIZE, get_batches_fn_nir,
-    #         train_op, cross_entropy_loss, image_input, net_input_nir,
-    #         correct_label, keep_prob, learning_rate, saver)
-
-    #print(all_training_losses)
 
     # Save inference data
     helper.save_inference_samples_nir_ttv(RUNS_DIRECTORY, test_dirs, session, IMAGE_SHAPE, logits, keep_prob, image_input, net_input_nir)
